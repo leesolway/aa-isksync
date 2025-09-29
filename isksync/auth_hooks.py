@@ -16,7 +16,6 @@ def register_isksync_dashboard():
         order = 100
 
         def render(self, request):
-            # Only show the widget if the user is assigned to at least one SystemOwnership
             so_qs = SystemOwnership.objects.filter(auth_group__group__user=request.user)
             if not so_qs.exists():
                 return ""
@@ -24,16 +23,13 @@ def register_isksync_dashboard():
             today = timezone.now().date()
             month_start = today.replace(day=1)
 
-            # Scope to the user's assigned systems
             tc_qs = TaxCycle.objects.select_related("system_ownership", "system_ownership__system").filter(system_ownership__in=so_qs)
 
-            # Outstanding cycles for end user: pending or explicitly overdue (any period)
             outstanding = (
                 tc_qs.filter(status__in=["PENDING", "OVERDUE"])\
                     .order_by("due_date", "system_ownership__system__name")[:5]
             )
 
-            # attach compact currency formatting for remaining amount
             from decimal import Decimal
             def _fmt_isk_short(amount: Decimal | None) -> str:
                 if amount is None:
@@ -61,7 +57,6 @@ def register_isksync_dashboard():
                 "outstanding": outstanding,
                 "can_manage": _can_manage(request.user),
             }
-            # AllianceAuth (BS5 dashboard_hook) expects render() to return HTML
             return render_to_string("isksync/dashboard_widget.html", context=context, request=request)
 
     return IskSyncDashboardPanel()
@@ -96,7 +91,6 @@ class IskSyncMainMenu(MenuItemHook):
         )
 
     def render(self, request):
-        # Show menu if user has assignment OR can manage
         if _user_has_assignment(request.user) or _can_manage(request.user):
             return MenuItemHook.render(self, request)
         return ""

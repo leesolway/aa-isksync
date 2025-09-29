@@ -371,116 +371,92 @@ class TaxCycleAdmin(admin.ModelAdmin):
             .select_related("system_ownership", "system_ownership__system")
         )
 
-    actions = ["mark_as_paid", "mark_as_overdue", "write_off_selected", "send_discord_reminder", "send_test_discord_notifications"]
+    actions = [
+        "mark_as_paid",
+        "mark_as_overdue",
+        "write_off_selected",
+        "send_discord_reminder_advance",
+        "send_discord_reminder_due",
+        "send_discord_reminder_overdue",
+        "send_test_discord_notifications",
+    ]
 
-    def send_discord_reminder(self, request, queryset):
-        """Send batched Discord reminder notifications grouped by channel"""
+    def _send_discord_reminder_type(self, request, queryset, chosen_type: str):
         from isksync.discord_notifications import send_batched_discord_notification, log_notification
         from isksync.models import DiscordNotificationConfig
         from datetime import date
         
-        # Get active Discord config
         config = DiscordNotificationConfig.objects.filter(is_active=True).first()
         if not config:
-            self.message_user(
-                request,
-                "No active Discord configuration found. Please create one first.",
-                level=messages.ERROR
-            )
+            self.message_user(request, "No active Discord configuration found. Please create one first.", level=messages.ERROR)
             return
         
-        # Group all cycles by notification type (ignore individual discord_channel)
-        cycles_by_type = {
-            "ADVANCE": [],
-            "DUE": [],
-            "OVERDUE": [],
-        }
+        cycles_by_type = {"ADVANCE": [], "DUE": [], "OVERDUE": []}
         all_ping_groups = set()
         today = date.today()
         
         for cycle in queryset:
-            days_until_due = (cycle.due_date - today).days
-            
-            # Determine notification type
-            if days_until_due > 0:
-                notification_type = "ADVANCE"
-            elif days_until_due == 0:
-                notification_type = "DUE"
-            else:
-                notification_type = "OVERDUE"
-            
-            cycles_by_type[notification_type].append(cycle)
-            
-            # Collect all ping groups from all systems
+            cycles_by_type[chosen_type].append(cycle)
             if hasattr(cycle.system_ownership, 'ping_groups'):
                 all_ping_groups.update(cycle.system_ownership.ping_groups.all())
         
-        # Remove empty notification types
         cycles_by_type = {k: v for k, v in cycles_by_type.items() if v}
-        
         if not cycles_by_type:
             self.message_user(request, "No cycles to notify.", level=messages.WARNING)
             return
         
-        # Use base webhook URL (ignore individual discord_channel)
         webhook_url = config.webhook_base_url
-        
-        # Send single batched notification
         success, status_code, error_message = send_batched_discord_notification(
             webhook_url=webhook_url,
             cycles_by_type=cycles_by_type,
             config=config,
-            all_ping_groups=all_ping_groups
+            all_ping_groups=all_ping_groups,
         )
         
-        # Log for all affected cycles
         all_cycles = []
         for cycles in cycles_by_type.values():
             all_cycles.extend(cycles)
         
         for cycle in all_cycles:
-            days_until_due = (cycle.due_date - today).days
-            if days_until_due > 0:
-                cycle_notification_type = "ADMIN_ADVANCE"
-            elif days_until_due == 0:
-                cycle_notification_type = "ADMIN_DUE"
-            else:
-                cycle_notification_type = "ADMIN_OVERDUE"
-                
+            cycle_notification_type = f"ADMIN_{chosen_type}"
             log_notification(
                 tax_cycle=cycle,
                 notification_type=cycle_notification_type,
                 webhook_url=webhook_url,
                 success=success,
                 status_code=status_code,
-                error_message=error_message
+                error_message=error_message,
             )
-            
-            # Log audit action
             log_action(
                 user=request.user,
                 action="admin_send_discord_reminder",
                 target=cycle,
-                details={
-                    "notification_type": cycle_notification_type,
-                    "success": success,
-                }
+                details={"notification_type": cycle_notification_type, "success": success},
             )
         
         sent_count = len(all_cycles) if success else 0
         failed_count = len(all_cycles) if not success else 0
-        
-        # Show results
-        if success:
-            message = f"Sent 1 batched Discord notification with {sent_count} cycles successfully."
-            level = messages.SUCCESS
-        else:
-            message = f"Failed to send batched Discord notification with {failed_count} cycles."
-            level = messages.ERROR
-        
+        message = (
+            f"Sent 1 batched Discord notification with {sent_count} cycles successfully." if success
+            else f"Failed to send batched Discord notification with {failed_count} cycles."
+        )
+        level = messages.SUCCESS if success else messages.ERROR
         self.message_user(request, message, level=level)
-    
-    send_discord_reminder.short_description = "Send batched Discord reminder notifications"
+
+    def send_discord_reminder_advance(self, request, queryset):
+        return self._send_discord_reminder_type(request, queryset, "ADVANCE")
+
+    send_discord_reminder_advance.short_description = "Send batched Discord reminder: Due Soon"
+
+    def send_discord_reminder_due(self, request, queryset):
+        return self._send_discord_reminder_type(request, queryset, "DUE")
+
+    send_discord_reminder_due.short_description = "Send batched Discord reminder: Due Today"
+
+    def send_discord_reminder_overdue(self, request, queryset):
+        return self._send_discord_reminder_type(request, queryset, "OVERDUE")
+
+    send_discord_reminder_overdue.short_description = "Send batched Discord reminder: Overdue"
     
     def send_test_discord_notifications(self, request, queryset):
         """Send batched test Discord notifications for all notification types"""

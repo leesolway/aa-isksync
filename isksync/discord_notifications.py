@@ -99,6 +99,41 @@ def _fmt_isk_short(amount: Decimal | None) -> str:
     return f"{float(amt):,.2f}"
 
 
+def determine_notification_type(
+    cycle: TaxCycle,
+    today: date,
+    config: DiscordNotificationConfig,
+    respect_config_flags: bool = True,
+) -> Optional[str]:
+    """
+    Determine the notification type for a cycle with priority OVERDUE > DUE > ADVANCE.
+
+    Returns one of "OVERDUE", "DUE", "ADVANCE", or None (if suppressed by config when
+    respect_config_flags is True).
+    """
+    days_until_due = (cycle.due_date - today).days
+
+    # OVERDUE
+    if days_until_due < 0:
+        if (not respect_config_flags or config.send_overdue_notice) and cycle.status in ["PENDING", "OVERDUE"]:
+            return "OVERDUE"
+        return None
+
+    # DUE TODAY
+    if days_until_due == 0:
+        if not respect_config_flags or config.send_due_notice:
+            return "DUE"
+        return None
+
+    # ADVANCE (due soon)
+    if days_until_due == getattr(config, "advance_notice_days", None):
+        if not respect_config_flags or config.send_advance_notice:
+            return "ADVANCE"
+        return None
+
+    return None
+
+
 def create_discord_embed(
     tax_cycle: TaxCycle,
     notification_type: str,
@@ -524,17 +559,10 @@ def process_all_tax_cycle_notifications() -> Dict[str, int]:
             days_until_due = (cycle.due_date - today).days
             notification_type = None
             
-            if days_until_due == config.advance_notice_days and config.send_advance_notice:
-                notification_type = "ADVANCE"
-            elif days_until_due == 0 and config.send_due_notice:
-                notification_type = "DUE"
-            elif days_until_due < 0 and config.send_overdue_notice and cycle.status in ["PENDING", "OVERDUE"]:
-                notification_type = "OVERDUE"
+            notification_type = determine_notification_type(cycle, today, config, respect_config_flags=True)
             
             if not notification_type:
                 continue
-                
-            # Check if already sent today (for automated notifications)
             existing_log = DiscordNotificationLog.objects.filter(
                 tax_cycle=cycle,
                 notification_type=f"BATCHED_{notification_type}",
@@ -547,7 +575,6 @@ def process_all_tax_cycle_notifications() -> Dict[str, int]:
             
             cycles_by_type[notification_type].append(cycle)
             
-            # Collect all ping groups from all systems
             if hasattr(cycle.system_ownership, 'ping_groups'):
                 all_ping_groups.update(cycle.system_ownership.ping_groups.all())
         
@@ -575,15 +602,13 @@ def process_all_tax_cycle_notifications() -> Dict[str, int]:
             all_cycles.extend(cycles)
         
         for cycle in all_cycles:
-            # Determine the specific notification type for this cycle
-            days_until_due = (cycle.due_date - today).days
-            if days_until_due == config.advance_notice_days:
-                cycle_notification_type = "ADVANCE"
-            elif days_until_due == 0:
-                cycle_notification_type = "DUE"
-            else:
-                cycle_notification_type = "OVERDUE"
-                
+            cycle_notification_type = determine_notification_type(cycle, today, config, respect_config_flags=True)
+            if not cycle_notification_type:
+                days_until_due = (cycle.due_date - today).days
+                cycle_notification_type = (
+                    "DUE" if days_until_due == 0 else ("ADVANCE" if days_until_due > 0 else "OVERDUE")
+                )
+            
             log_notification(
                 tax_cycle=cycle,
                 notification_type=f"BATCHED_{cycle_notification_type}",

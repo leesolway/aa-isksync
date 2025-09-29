@@ -170,7 +170,8 @@ def send_discord_notifications():
             f"Cycles checked: {summary['cycles_checked']}, "
             f"Notifications sent: {summary['notifications_sent']}, "
             f"Failed: {summary['notifications_failed']}, "
-            f"Systems with config: {summary['systems_with_config']}"
+            f"Batched messages sent: {summary['batched_messages_sent']}, "
+            f"Config found: {summary['config_found']}"
         )
         
         return summary

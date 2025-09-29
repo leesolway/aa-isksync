@@ -64,27 +64,22 @@ class MyDueTaxesView(TemplateView):
             .filter(tax_active=True)
             .prefetch_related("auth_group__group__user_set")
         )
-        # attach formatted current rate
         for s in systems:
             try:
                 s.current_rate_fmt = _fmt_isk_short(s.get_current_tax_amount())
             except Exception:
                 s.current_rate_fmt = "-"
 
-        # Show all outstanding cycles (payments/obligations) for the user
         cycles_qs = (
             TaxCycle.objects.select_related("system_ownership", "system_ownership__system")
             .prefetch_related("obligations__obligation_type")
             .filter(system_ownership__in=systems, status__in=["PENDING", "OVERDUE"])
             .order_by("due_date", "system_ownership__system__name")
         )
-        # Materialize queryset to avoid re-evaluation losing attached attributes
         cycles = list(cycles_qs)
-        # attach formatted amounts
         for c in cycles:
             c.expected_fmt = _fmt_isk_short(c.expected_amount)
             c.paid_fmt = "-" if c.paid_amount is None else _fmt_isk_short(c.paid_amount)
-            # Outstanding obligations (Pending or Failed)
             try:
                 c.outstanding_obligations = [
                     o for o in c.obligations.all() if getattr(o, "status", "PENDING") in ("PENDING", "FAILED")
@@ -92,10 +87,8 @@ class MyDueTaxesView(TemplateView):
             except Exception:
                 c.outstanding_obligations = []
 
-        # Build a list of cycles with at least one outstanding obligation
         cycles_with_outstanding = [c for c in cycles if getattr(c, "outstanding_obligations", [])]
 
-        # Flatten outstanding obligations into rows for a table view
         outstanding_obligations = []
         for c in cycles_with_outstanding:
             for o in c.outstanding_obligations:
@@ -192,8 +185,6 @@ class ManageView(TemplateView):
         for c in cycles_marked_paid + cycles_unmarked:
             c.expected_fmt = _fmt_isk_short(c.expected_amount)
 
-        # Obligations queues (for cycles that are still open)
-        # Completed obligations are reviewed on the obligations page; not shown here
         obligations_outstanding = list(
             TaxCycleObligation.objects.select_related(
                 "tax_cycle__system_ownership__system",
@@ -203,7 +194,6 @@ class ManageView(TemplateView):
             .order_by("tax_cycle__due_date", "tax_cycle__system_ownership__system__name", "obligation_type__name")
         )
 
-        # Attach recent logs (last 5) to visible cycles
         try:
             cycle_ct = ContentType.objects.get_for_model(TaxCycle)
             visible_ids = list({*(c.pk for c in cycles_marked_paid), *(c.pk for c in cycles_unmarked)})
@@ -323,7 +313,6 @@ class OwnershipDetailView(TemplateView):
             ),
             pk=pk,
         )
-        # Permission: manager or member of auth group
         if not _can_manage(request.user):
             group = getattr(ownership, "auth_group", None)
             if not group or not group.group.user_set.filter(pk=request.user.pk).exists():
@@ -339,7 +328,6 @@ class OwnershipDetailView(TemplateView):
             current_rate_fmt = _fmt_isk_short(so.get_current_tax_amount())
         except Exception:
             current_rate_fmt = "-"
-        # Active agreements
         agreements = [sot for sot in so.obligation_types.all() if getattr(sot, "is_active", True)]
         members = []
         try:
@@ -347,7 +335,6 @@ class OwnershipDetailView(TemplateView):
         except Exception:
             members = []
 
-        # Recent activity by group members on this ownership's cycles/obligations
         from django.contrib.contenttypes.models import ContentType
         member_ids = [u.pk for u in members]
         cycle_ids = list(
@@ -589,7 +576,6 @@ def toggle_user_marked_paid(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return redirect("isksync:my_due")
 
-    # Ensure the cycle belongs to a system the user has access to
     systems = _user_systems(request.user)
     cycle = get_object_or_404(
         TaxCycle.objects.select_related("system_ownership", "system_ownership__system"),
@@ -597,7 +583,6 @@ def toggle_user_marked_paid(request: HttpRequest, pk: int) -> HttpResponse:
         system_ownership__in=systems,
     )
 
-    # Toggle the user_marked_paid flag; do not change official status
     cycle.user_marked_paid = not cycle.user_marked_paid
     if cycle.user_marked_paid:
         cycle.user_marked_paid_at = timezone.now()
@@ -613,7 +598,6 @@ def toggle_user_marked_paid(request: HttpRequest, pk: int) -> HttpResponse:
         )
     cycle.save(update_fields=["user_marked_paid", "user_marked_paid_at", "updated_at"])
 
-    # Audit log
     from_date = cycle.user_marked_paid_at.isoformat() if cycle.user_marked_paid_at else None
     log_action(
         user=request.user,
@@ -626,7 +610,6 @@ def toggle_user_marked_paid(request: HttpRequest, pk: int) -> HttpResponse:
         request=request,
     )
 
-    # Prefer to return to referrer; fallback to My Due
     next_url = request.META.get("HTTP_REFERER") or reverse("isksync:my_due")
     return HttpResponseRedirect(next_url)
 
@@ -641,7 +624,6 @@ def mark_cycle_pending(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("isksync:manage")
 
     cycle = get_object_or_404(TaxCycle, pk=pk)
-    # Reset to pending and clear payment fields
     cycle.status = "PENDING"
     cycle.paid_amount = None
     cycle.paid_date = None

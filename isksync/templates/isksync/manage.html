@@ -31,6 +31,7 @@
             <thead>
               <tr>
                 <th>{% trans "System" %}</th>
+                <th>{% trans "Group" %}</th>
                 <th>{% trans "Period" %}</th>
                 <th class="text-end">{% trans "Expected" %}</th>
                 <th>{% trans "Status" %}</th>
@@ -45,6 +46,7 @@
               {% for c in cycles_marked_paid %}
               <tr>
 <td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
+                <td>{% if c.system_ownership.auth_group %}{{ c.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
                 <td>{{ c.period_start|date:"M Y" }}</td>
                 <td class="text-end">{{ c.expected_fmt }} ISK</td>
                 <td>
@@ -103,7 +105,7 @@
                 </td>
               </tr>
               <tr class="collapse" id="logs-out-{{ c.pk }}">
-                <td colspan="9">
+                <td colspan="10">
                   <div class="p-2 bg-light border rounded">
                     {% include "isksync/partials/audit_logs_list.html" with logs=c.recent_logs %}
                   </div>
@@ -131,6 +133,7 @@
           <thead>
             <tr>
               <th>{% trans "System" %}</th>
+              <th>{% trans "Group" %}</th>
               <th>{% trans "Period" %}</th>
               <th class="text-end">{% trans "Expected" %}</th>
               <th>{% trans "Status" %}</th>
@@ -144,6 +147,7 @@
             {% for c in cycles_unmarked %}
             <tr>
 <td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
+              <td>{% if c.system_ownership.auth_group %}{{ c.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
               <td>{{ c.period_start|date:"M Y" }}</td>
               <td class="text-end">{{ c.expected_fmt }} ISK</td>
               <td>
