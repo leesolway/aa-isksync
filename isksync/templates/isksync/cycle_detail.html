@@ -51,7 +51,11 @@
           <div class="col-5 text-muted small">{% trans "Lead Character" %}</div>
           <div class="col-7">
             {% if cycle.system_ownership.primary_user %}
-              <span class="badge bg-primary">{{ cycle.system_ownership.primary_user.username }}</span>
+              {% if cycle.system_ownership.primary_user.profile.main_character %}
+                <span class="badge bg-primary" title="{{ cycle.system_ownership.primary_user.username }}">{{ cycle.system_ownership.primary_user.profile.main_character.character_name }}</span>
+              {% else %}
+                <span class="badge bg-warning text-dark" title="No main character set">{{ cycle.system_ownership.primary_user.username }}</span>
+              {% endif %}
             {% else %}
               <span class="text-muted">-</span>
             {% endif %}
@@ -99,7 +103,11 @@
           <div class="small text-muted mb-2">{{ members|length }} {% trans "members" %}</div>
           <div class="d-flex flex-wrap gap-2">
             {% for u in members %}
-              <span class="badge bg-secondary">{{ u.username }}</span>
+              {% if u.profile.main_character %}
+                <span class="badge bg-secondary" title="{{ u.username }}">{{ u.profile.main_character.character_name }}</span>
+              {% else %}
+                <span class="badge bg-outline-secondary" title="No main character set">{{ u.username }}</span>
+              {% endif %}
             {% endfor %}
           </div>
         {% else %}

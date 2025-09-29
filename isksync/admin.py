@@ -2,6 +2,7 @@ from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils.html import format_html
+from django import forms
 
 from .audit import log_action
 from .models import (
@@ -17,6 +18,68 @@ from .models import (
 )
 
 User = get_user_model()
+
+
+class UserModelChoiceField(forms.ModelChoiceField):
+    """Custom ModelChoiceField that displays main character names in dropdowns"""
+    
+    def label_from_instance(self, obj):
+        """Return the representation of the choice field label"""
+        try:
+            if hasattr(obj, 'profile') and obj.profile.main_character:
+                main_char = obj.profile.main_character
+                return f"{main_char.character_name} ({obj.username})"
+            else:
+                return f"{obj.username} (no main character)"
+        except Exception:
+            return obj.username
+
+
+class SystemOwnershipAdminForm(forms.ModelForm):
+    """Custom form for SystemOwnership admin to show character names in primary_user dropdown"""
+    
+    primary_user = UserModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        help_text="The primary user responsible for this system. Must be a member of the auth group."
+    )
+    
+    class Meta:
+        model = SystemOwnership
+        fields = '__all__'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Order auth_group dropdown alphabetically by group name
+        if 'auth_group' in self.fields:
+            from allianceauth.groupmanagement.models import AuthGroup
+            self.fields['auth_group'].queryset = AuthGroup.objects.select_related('group').order_by('group__name')
+        
+        # Set default ordering for primary_user dropdown (alphabetically by character name, then username)
+        # Order by character name first, then username for users without main characters
+        self.fields['primary_user'].queryset = User.objects.select_related(
+            'profile', 'profile__main_character'
+        ).order_by(
+            'profile__main_character__character_name',
+            'username'
+        )
+        
+        # If we have an existing instance with an auth_group, limit primary_user choices
+        if self.instance and self.instance.pk and hasattr(self.instance, 'auth_group'):
+            try:
+                if self.instance.auth_group:
+                    group_users = self.instance.auth_group.group.user_set.all()
+                    if group_users.exists():
+                        self.fields['primary_user'].queryset = group_users.select_related(
+                            'profile', 'profile__main_character'
+                        ).order_by(
+                            'profile__main_character__character_name',
+                            'username'
+                        )
+            except SystemOwnership.auth_group.RelatedObjectDoesNotExist:
+                # auth_group not set yet, use default queryset
+                pass
 
 
 class TaxCycleInline(admin.TabularInline):
@@ -71,6 +134,7 @@ class TaxCycleObligationInline(admin.TabularInline):
 
 @admin.register(SystemOwnership)
 class SystemOwnershipAdmin(admin.ModelAdmin):
+    form = SystemOwnershipAdminForm
     autocomplete_fields = ("system",)
     search_fields = ("system__name",)  # Enable autocomplete for this model
 
@@ -78,7 +142,7 @@ class SystemOwnershipAdmin(admin.ModelAdmin):
         "system",
         "ownership_type",
         "auth_group",
-        "primary_user",
+        "primary_user_character",
         "tax_active",
         "current_tax_amount",
         "discord_channel",
@@ -89,13 +153,20 @@ class SystemOwnershipAdmin(admin.ModelAdmin):
     search_fields = (
         "system__name",
         "primary_user__username",
+        "primary_user__profile__main_character__character_name",
         "discord_channel",
         "auth_group__name",
     )
 
     list_per_page = 50
     list_max_show_all = 200
-    list_select_related = ("system", "primary_user", "auth_group")
+    list_select_related = (
+        "system", 
+        "primary_user", 
+        "primary_user__profile", 
+        "primary_user__profile__main_character",
+        "auth_group"
+    )
 
     fieldsets = (
         ("System Information", {"fields": ("system", "ownership_type")}),
@@ -129,6 +200,33 @@ class SystemOwnershipAdmin(admin.ModelAdmin):
         )
 
     user_count_display.short_description = "Group Members"
+    
+    def primary_user_character(self, obj):
+        """Display the main character name instead of username"""
+        if not obj.primary_user:
+            return "-"
+        
+        # Get the main character from the user profile
+        try:
+            if hasattr(obj.primary_user, 'profile') and obj.primary_user.profile.main_character:
+                main_char = obj.primary_user.profile.main_character
+                return format_html(
+                    '<span title="{}">{}</span>',
+                    obj.primary_user.username,  # Show username on hover
+                    main_char.character_name
+                )
+            else:
+                # Fallback to username if no main character
+                return format_html(
+                    '<span style="color: #dc3545;" title="No main character set">{}</span>',
+                    obj.primary_user.username
+                )
+        except Exception:
+            # Fallback to username if there's any error
+            return obj.primary_user.username
+    
+    primary_user_character.short_description = "Primary User"
+    primary_user_character.admin_order_field = "primary_user__profile__main_character__character_name"
 
     def current_tax_amount(self, obj):
         """Display the current default tax amount"""
@@ -162,21 +260,17 @@ class SystemOwnershipAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("system", "primary_user", "auth_group")
+            .select_related(
+                "system", 
+                "primary_user", 
+                "primary_user__profile", 
+                "primary_user__profile__main_character",
+                "auth_group"
+            )
         )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "primary_user":
-            obj_id = request.resolver_match.kwargs.get("object_id")
-            if obj_id:
-                try:
-                    obj = self.get_object(request, obj_id)
-                    if obj and obj.auth_group:
-                        group_users = obj.auth_group.group.user_set.all()
-                        if group_users.exists():
-                            kwargs["queryset"] = group_users
-                except:
-                    pass
+        # Primary user field is now handled by the custom form
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 

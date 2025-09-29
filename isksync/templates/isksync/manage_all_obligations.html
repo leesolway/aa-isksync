@@ -47,7 +47,7 @@
                   {% if members %}
                     {% for u in members %}
                       {% if forloop.counter <= 4 %}
-                        {{ u.username }}{% if not forloop.last and forloop.counter < 4 %}, {% endif %}
+                        {% if u.profile.main_character %}{{ u.profile.main_character.character_name }}{% else %}{{ u.username }}{% endif %}{% if not forloop.last and forloop.counter < 4 %}, {% endif %}
                       {% endif %}
                     {% endfor %}
                     {% if members|length > 4 %}&nbsp;…{% endif %}

@@ -42,7 +42,11 @@
                 <td>{{ s.ownership_type.label }}</td>
                 <td>
                   {% if s.primary_user %}
-                    <span class="badge bg-primary">{{ s.primary_user.username }}</span>
+                    {% if s.primary_user.profile.main_character %}
+                      <span class="badge bg-primary" title="{{ s.primary_user.username }}">{{ s.primary_user.profile.main_character.character_name }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark" title="No main character set">{{ s.primary_user.username }}</span>
+                    {% endif %}
                   {% else %}
                     <span class="text-muted">-</span>
                   {% endif %}
@@ -52,7 +56,7 @@
                     {% if members %}
                       {% for u in members %}
                         {% if forloop.counter <= 6 %}
-                          {{ u.username }}{% if not forloop.last and forloop.counter < 6 %}, {% endif %}
+                          {% if u.profile.main_character %}{{ u.profile.main_character.character_name }}{% else %}{{ u.username }}{% endif %}{% if not forloop.last and forloop.counter < 6 %}, {% endif %}
                         {% endif %}
                       {% endfor %}
                       {% if members|length > 6 %}&nbsp;…{% endif %}
