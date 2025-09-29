@@ -1,0 +1,78 @@
+{% load i18n %}
+{% with obligations=obligations|default:cycle.obligations.all %}
+  {% if obligations %}
+    <ul class="list-group list-group-flush">
+      {% for obligation in obligations %}
+        <li class="list-group-item px-2 py-2 d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <i class="fa-solid fa-flag text-muted"></i>
+            <span class="fw-semibold">{{ obligation.obligation_type.name }}</span>
+            {% if obligation.status == 'COMPLETED' %}
+              <span class="badge rounded-pill bg-success d-inline-flex align-items-center gap-1">
+                <i class="fa-solid fa-check"></i> {% trans "Completed" %}
+              </span>
+              {% if obligation.fulfilled_date %}
+                <small class="text-muted">{% trans "on" %} {{ obligation.fulfilled_date|date:"M j, Y" }}</small>
+              {% endif %}
+            {% elif obligation.status == 'FAILED' %}
+              <span class="badge rounded-pill bg-danger d-inline-flex align-items-center gap-1">
+                <i class="fa-solid fa-xmark"></i> {% trans "Failed" %}
+              </span>
+            {% else %}
+              <span class="badge rounded-pill bg-warning text-dark d-inline-flex align-items-center gap-1">
+                <i class="fa-solid fa-clock"></i> {% trans "Pending" %}
+              </span>
+            {% endif %}
+          </div>
+
+          {% if show_actions %}
+            <div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Actions' %}">
+              <form method="post" action="{% if admin_mode %}{% url 'isksync:admin_toggle_obligation' obligation.pk %}{% else %}{% url 'isksync:toggle_obligation_fulfilled' obligation.pk %}{% endif %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="complete" />
+                <button class="btn btn-outline-success" type="submit" title="{% trans 'Mark completed' %}">
+                  <i class="fa-solid fa-check"></i>
+                </button>
+              </form>
+              <form method="post" action="{% if admin_mode %}{% url 'isksync:admin_toggle_obligation' obligation.pk %}{% else %}{% url 'isksync:toggle_obligation_fulfilled' obligation.pk %}{% endif %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="pending" />
+                <button class="btn btn-outline-secondary" type="submit" title="{% trans 'Set pending' %}">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+              </form>
+              <form method="post" action="{% if admin_mode %}{% url 'isksync:admin_toggle_obligation' obligation.pk %}{% else %}{% url 'isksync:toggle_obligation_fulfilled' obligation.pk %}{% endif %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="fail" />
+                <button class="btn btn-outline-danger" type="submit" title="{% trans 'Mark failed' %}">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+
+    {# Compact progress indicator #}
+    {% with fulfilled_count=cycle.fulfilled_obligation_count total_count=cycle.obligation_count %}
+      {% if total_count > 0 %}
+        <div class="mt-2">
+          <div class="progress" style="height: 4px;">
+            <div class="progress-bar {% if fulfilled_count == total_count %}bg-success{% elif fulfilled_count > 0 %}bg-warning{% else %}bg-danger{% endif %}"
+                 role="progressbar"
+                 style="width: {% widthratio fulfilled_count total_count 100 %}%"
+                 aria-valuenow="{{ fulfilled_count }}"
+                 aria-valuemin="0"
+                 aria-valuemax="{{ total_count }}"></div>
+          </div>
+          <small class="text-muted">
+            {{ fulfilled_count }}/{{ total_count }} {% trans "obligations completed" %}
+          </small>
+        </div>
+      {% endif %}
+    {% endwith %}
+  {% else %}
+    <span class="text-muted small">{% trans "No obligations" %}</span>
+  {% endif %}
+{% endwith %}

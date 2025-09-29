@@ -1,0 +1,24 @@
+{% extends 'allianceauth/base-bs5.html' %}
+{% load i18n %}
+
+{% block header_nav_collapse_right %}
+    <!-- Left side user navigation -->
+    {% block user_nav %}{% endblock %}
+    
+    <!-- Right side admin navigation -->
+    {% block admin_nav %}
+    {% if perms.isksync.manage_tax_cycles or user.is_staff %}
+    <li class="nav-item ms-auto">
+        <a class="nav-link py-0" href="{% url 'isksync:manage' %}">
+            <span class="btn btn-success">
+                <i class="fa-solid fa-clipboard-check"></i> {% trans "Manage" %}
+            </span>
+        </a>
+    </li>
+    {% endif %}
+    {% endblock %}
+{% endblock %}
+
+{% block header_nav_brand %}
+    {% block page_header %}{% endblock %}
+{% endblock %}

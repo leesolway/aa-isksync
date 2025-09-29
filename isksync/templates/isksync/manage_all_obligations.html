@@ -1,0 +1,96 @@
+{% extends 'isksync/base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% trans "All Obligations" %}{% endblock %}
+
+{% block page_header %}
+  {% trans "All Obligations" %}
+{% endblock %}
+
+{% block user_nav %}
+{% include "isksync/partials/back_button.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-bold">{% trans "Obligations" %}</span>
+    <div>
+      <a class="btn btn-sm btn-outline-secondary" href="?status=PENDING">{% trans "Pending" %}</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?status=COMPLETED">{% trans "Completed" %}</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?status=FAILED">{% trans "Failed" %}</a>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if obligations %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Group" %}</th>
+              <th>{% trans "Members" %}</th>
+              <th>{% trans "Period" %}</th>
+              <th>{% trans "Obligation" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th>{% trans "Due Date" %}</th>
+              <th class="text-end">{% trans "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for o in obligations %}
+            <tr>
+              <td>{{ o.tax_cycle.system_ownership.system.name }}</td>
+              <td>{% if o.tax_cycle.system_ownership.auth_group %}{{ o.tax_cycle.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
+              <td class="small text-muted text-break">
+                {% with members=o.tax_cycle.system_ownership.auth_group.group.user_set.all %}
+                  {% if members %}
+                    {% for u in members %}
+                      {% if forloop.counter <= 4 %}
+                        {{ u.username }}{% if not forloop.last and forloop.counter < 4 %}, {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if members|length > 4 %}&nbsp;…{% endif %}
+                  {% else %}-{% endif %}
+                {% endwith %}
+              </td>
+              <td>{{ o.tax_cycle.period_start|date:"M Y" }}</td>
+              <td class="fw-semibold">{{ o.obligation_type.name }}</td>
+              <td>
+                {% if o.status == 'COMPLETED' %}
+                  <span class="badge bg-success">{% trans "Completed" %}</span>
+                {% elif o.status == 'FAILED' %}
+                  <span class="badge bg-danger">{% trans "Failed" %}</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
+                {% endif %}
+              </td>
+              <td>{{ o.tax_cycle.due_date|date:"M j, Y" }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="complete" />
+                  <button type="submit" class="btn btn-sm btn-success">{% trans "Complete" %}</button>
+                </form>
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="pending" />
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">{% trans "Pending" %}</button>
+                </form>
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="fail" />
+                  <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Fail" %}</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">{% trans "No obligations found." %}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

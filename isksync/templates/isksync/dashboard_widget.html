@@ -1,0 +1,49 @@
+{% load i18n humanize %}
+<div class="col-12 col-xl-8 mb-3">
+  <div class="card h-100 shadow-sm">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span class="fw-bold">{{ title }}</span>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-primary" href="{% url 'isksync:my_due' %}">{% trans "View Cycles" %}</a>
+      </div>
+    </div>
+    <div class="card-body py-3">
+    {% if outstanding %}
+    <div class="table-responsive">
+      <table class="table table-sm table-borderless align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="text-nowrap">{% trans "System" %}</th>
+            <th class="text-nowrap">{% trans "Period" %}</th>
+            <th class="text-end text-nowrap">{% trans "Remaining" %}</th>
+            <th class="text-nowrap">{% trans "Status" %}</th>
+            <th class="text-nowrap">{% trans "Due" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in outstanding %}
+          <tr>
+            <td>{{ c.system_ownership.system.name }}</td>
+            <td>{{ c.period_start|date:"M Y" }}</td>
+            <td class="text-end">{{ c.remaining_fmt }} ISK</td>
+            <td>
+              {% if c.status == 'OVERDUE' %}
+                <span class="badge bg-danger">{{ c.get_status_display }}</span>
+              {% elif c.status == 'PENDING' %}
+                <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ c.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>{{ c.due_date|date:"Y-m-d" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="text-center text-muted">{% trans "You're all caught up. No outstanding cycles." %}</div>
+    {% endif %}
+    </div>
+  </div>
+</div>

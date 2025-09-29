@@ -1,0 +1,219 @@
+{% extends 'isksync/base.html' %}
+{% load i18n humanize %}
+
+{% block page_title %}{% trans "Tax Due" %}{% endblock %}
+
+{% block page_header %}
+    {% trans "Tax Due" %}
+{% endblock %}
+
+{% block user_nav %}
+<li class="nav-item me-auto">
+    <a class="nav-link py-0" href="{% url 'isksync:my_history' %}">
+        <span class="btn btn-primary">
+            <i class="fa-solid fa-history"></i> {% trans "History" %}
+        </span>
+    </a>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-header">
+    {% trans "Current Ownerships" %}
+  </div>
+  <div class="card-body">
+    {% if systems %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Ownership Type" %}</th>
+              <th>{% trans "Lead Character" %}</th>
+              <th>{% trans "Members" %}</th>
+              <th class="text-end">{% trans "Current Rate" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in systems %}
+              <tr>
+                <td><a href="{% url 'isksync:ownership_detail' s.pk %}">{{ s.system.name }}</a></td>
+                <td>{{ s.ownership_type.label }}</td>
+                <td>
+                  {% if s.primary_user %}
+                    <span class="badge bg-primary">{{ s.primary_user.username }}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted text-break">
+                  {% with members=s.auth_group.group.user_set.all %}
+                    {% if members %}
+                      {% for u in members %}
+                        {% if forloop.counter <= 6 %}
+                          {{ u.username }}{% if not forloop.last and forloop.counter < 6 %}, {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                      {% if members|length > 6 %}&nbsp;…{% endif %}
+                    {% else %}
+                      -
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td class="text-end">{{ s.current_rate_fmt }} ISK</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">{% trans "You have no current ownerships." %}</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Outstanding Payments Section -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="fa-solid fa-credit-card me-2"></i>
+      {% trans "Outstanding Payments" %}
+    </h5>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info mb-3">
+      <i class="fa-solid fa-info-circle me-2"></i>
+      {% trans "Payments are created on the 1st and are due by the end of the current period." %}
+    </div>
+    
+    {% if cycles %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Period" %}</th>
+              <th class="text-end">{% trans "Expected" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th>{% trans "Due Date" %}</th>
+              <th class="text-end">{% trans "Mark as Paid" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in cycles %}
+              <tr>
+                <td>
+<a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}"><strong>{{ c.system_ownership.system.name }}</strong></a>
+                </td>
+                <td>{{ c.period_start|date:"M Y" }}</td>
+                <td class="text-end">{{ c.expected_fmt }} ISK</td>
+                <td>
+                  {% if c.status == 'OVERDUE' %}
+                    <span class="badge bg-danger">{{ c.get_status_display }}</span>
+                  {% elif c.status == 'PENDING' %}
+                    <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ c.get_status_display }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if c.is_overdue %}
+                    <span class="text-danger fw-bold">{{ c.due_date|date:"M j, Y" }}</span>
+                  {% else %}
+                    {{ c.due_date|date:"M j, Y" }}
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'isksync:toggle_user_marked_paid' c.pk %}">
+                    {% csrf_token %}
+                    {% if c.user_marked_paid %}
+                      <div class="d-flex justify-content-end align-items-center gap-2">
+                        <span class="badge bg-info text-dark">{% trans "Marked" %}{% if c.user_marked_paid_at %} {{ c.user_marked_paid_at|date:"Y-m-d H:i" }}{% endif %}</span>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">{% trans "Undo" %}</button>
+                      </div>
+                    {% else %}
+                      <button class="btn btn-sm btn-success" type="submit">{% trans "I've paid for this period" %}</button>
+                    {% endif %}
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="d-flex align-items-center justify-content-center py-4">
+        <div class="text-center">
+          <i class="fa-solid fa-check-circle text-success fa-2x mb-2"></i>
+          <p class="text-muted mb-0">{% trans "No outstanding payments for the current period." %}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Outstanding Obligations Section -->
+<div class="card">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="fa-solid fa-tasks me-2"></i>
+      {% trans "Outstanding Obligations" %}
+    </h5>
+  </div>
+  <div class="card-body">
+    {% if outstanding_obligations %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Period" %}</th>
+              <th>{% trans "Obligation" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th class="text-end">{% trans "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in outstanding_obligations %}
+              {% with cycle=row.cycle obligation=row.obligation %}
+              <tr>
+<td><a href="{% url 'isksync:ownership_detail' cycle.system_ownership.pk %}">{{ cycle.system_ownership.system.name }}</a></td>
+                <td>{{ cycle.period_start|date:"M Y" }}</td>
+                <td class="fw-semibold">{{ obligation.obligation_type.name }}</td>
+                <td>
+                  {% if obligation.status == 'FAILED' %}
+                    <span class="badge bg-danger">{% trans "Failed" %}</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'isksync:toggle_obligation_fulfilled' obligation.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="complete" />
+                    <button type="submit" class="btn btn-sm btn-success" title="{% trans 'Mark completed' %}"><i class="fa-solid fa-check"></i></button>
+                  </form>
+                  <form method="post" action="{% url 'isksync:toggle_obligation_fulfilled' obligation.pk %}" class="d-inline ms-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="fail" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="{% trans 'Mark failed' %}"><i class="fa-solid fa-xmark"></i></button>
+                  </form>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="d-flex align-items-center justify-content-center py-4">
+        <div class="text-center">
+          <i class="fa-solid fa-check-circle text-success fa-2x mb-2"></i>
+          <p class="text-muted mb-0">{% trans "No outstanding obligations." %}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

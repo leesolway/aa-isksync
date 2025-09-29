@@ -1,0 +1,337 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Django & AllianceAuth specific
+*.log
+staticfiles/
+media/
+local.py
+local_settings.py
+settings/local.py
+
+# Static files collected by Django
+static/
+STATIC_ROOT/
+
+# Media files
+media/
+MEDIA_ROOT/
+
+# Secret keys and sensitive config
+.env
+.env.local
+.env.production
+secret_key.txt
+*.pem
+*.key
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Node.js (if using any frontend build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sass
+.sass-cache/
+
+# ESI tokens and cache
+esi_cache/
+*.token
+
+# AllianceAuth specific
+# Character/Corporation data cache
+character_cache/
+corp_cache/
+
+# Logs
+logs/
+*.log.*
+
+# Backup files
+*.sql
+*.dump
+backup/
+
+# Test coverage
+.coverage.*
+coverage/
+
+# Local development tools
+.pytest_cache/
+.tox/
+
+# Profiling data
+*.prof
+
+# Jupyter notebooks (if used for data analysis)
+.ipynb_checkpoints/
+
+# Virtual environment (various names)
+venv*/
+env*/
+.venv*/
+.env*/
+
+# Local SQLite databases (development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python cache
+*.pyc
+*.pyo
+
+# Vim
+*.swp
+*.swo
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Local configuration overrides
+local_config.py
+config_local.py
+settings_local.py
+
+# Certificate files
+*.crt
+*.cert
+*.p12
+
+# Development database dumps
+dump.sql
+*.dump.sql
+
+# Redis dump files (if using Redis)
+dump.rdb
+
+# Celery beat schedule
+celerybeat-schedule.*
+
+# ESI secrets
+client_secret.json
+secrets.json
+
+# Local patches or customizations
+patches/
+local_patches/
+
+# Documentation build
+docs/build/
+
+# Coverage reports
+htmlcov/
+.coverage
+
+# Django migrations backup
+*/migrations/*.py.backup
+
+# Local scripts
+scripts/local_*
+local_scripts/
+
+# Environment specific
+.env.*
+!.env.example
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# OIDC keys
+oidc.key
+*.oidc
+
+# Alliance Auth specific cache
+aa_cache/
+alliance_auth_cache/
+
+# ESI cache directories
+esi_cache/
+cache/
+
+# Local development docker overrides
+docker-compose.dev.yml
+docker-compose.debug.yml
+
+# Django app specific (aa-isksync)
+isksync/migrations/*.pyc
+isksync/__pycache__/

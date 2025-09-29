@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include MANIFEST.in
+recursive-include isksync/static *
+recursive-include isksync/templates *
+recursive-include isksync/migrations *.py
+global-exclude __pycache__
+global-exclude *.py[co]

@@ -1,0 +1,132 @@
+{% extends 'isksync/base.html' %}
+{% load i18n %}
+
+{% block page_title %}{{ ownership.system.name }} — {{ ownership.ownership_type.label }}{% endblock %}
+
+{% block page_header %}
+  {{ ownership.system.name }} — {{ ownership.ownership_type.label }}
+{% endblock %}
+
+{% block user_nav %}
+{% include "isksync/partials/back_button.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="card">
+      <div class="card-header"><span class="fw-bold">{% trans "Ownership" %}</span></div>
+      <div class="card-body">
+        <div class="alert alert-info small">
+          <i class="fa-solid fa-info-circle me-2"></i>
+          {% trans "Cycles are created on the 1st of each month and are due by the end of that month. Obligations align to the same period and due date." %}
+        </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "System" %}</div>
+          <div class="col-7">{{ ownership.system.name }}</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Ownership Type" %}</div>
+          <div class="col-7">{{ ownership.ownership_type.label }}</div>
+        </div>
+        {% if ownership.ownership_type.description %}
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Type Description" %}</div>
+          <div class="col-7">{{ ownership.ownership_type.description }}</div>
+        </div>
+        {% endif %}
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Group" %}</div>
+          <div class="col-7">{% if ownership.auth_group %}{{ ownership.auth_group.group.name }}{% else %}-{% endif %}</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Lead Character" %}</div>
+          <div class="col-7">
+            {% if ownership.primary_user %}
+              <span class="badge bg-primary">{{ ownership.primary_user.username }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Tax Active" %}</div>
+          <div class="col-7">{% if ownership.tax_active %}<span class="badge bg-success">{% trans "Active" %}</span>{% else %}<span class="badge bg-secondary">{% trans "Inactive" %}</span>{% endif %}</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Default Rate" %}</div>
+          <div class="col-7">{{ current_rate_fmt }} ISK</div>
+        </div>
+        {% if ownership.discord_channel %}
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Discord" %}</div>
+          <div class="col-7">{{ ownership.discord_channel }}</div>
+        </div>
+        {% endif %}
+        {% if ownership.notes %}
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">{% trans "Notes" %}</div>
+          <div class="col-7">{{ ownership.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header"><span class="fw-bold">{% trans "Members" %}</span></div>
+      <div class="card-body">
+        {% if members %}
+          <div class="small text-muted mb-2">{{ members|length }} {% trans "members" %}</div>
+          <div class="d-flex flex-wrap gap-2">
+            {% for u in members %}
+              <span class="badge bg-secondary">{{ u.username }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <span class="text-muted">{% trans "No members found." %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><span class="fw-bold">{% trans "Obligations" %}</span></div>
+      <div class="card-body">
+        {% if agreements %}
+          <ul class="list-group list-group-flush">
+            {% for a in agreements %}
+              <li class="list-group-item d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-flag text-muted"></i>
+                    <span class="fw-semibold">{{ a.obligation_type.name }}</span>
+                    {% if not a.is_active %}<span class="badge bg-secondary">{% trans "Inactive" %}</span>{% endif %}
+                  </div>
+                  {% if a.obligation_type.description %}
+                    <div class="small text-muted mt-1">{{ a.obligation_type.description }}</div>
+                  {% endif %}
+                </div>
+                <span class="text-muted small">ID: {{ a.pk }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <span class="text-muted">{% trans "No agreements configured." %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><span class="fw-bold">{% trans "Recent Activity by Members" %}</span></div>
+      <div class="card-body">
+        {% include "isksync/partials/audit_logs_list.html" with logs=member_activity %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

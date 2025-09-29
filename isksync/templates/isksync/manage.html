@@ -1,0 +1,275 @@
+{% extends 'isksync/base.html' %}
+{% load i18n humanize %}
+
+{% block page_title %}{% trans "Manage" %}{% endblock %}
+
+{% block page_header %}
+    {% trans "Manage" %}
+{% endblock %}
+
+{% block user_nav %}
+{% include "isksync/partials/back_button.html" %}
+{% include "isksync/partials/all_cycles_button.html" %}
+{% include "isksync/partials/all_obligations_button.html" %}
+{% endblock %}
+
+{% block admin_nav %}
+<!-- No admin nav on manage page - we're already here -->
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <span class="fw-bold">{% trans "Marked Paid (Pending/Overdue)" %}</span>
+      </div>
+      <div class="card-body">
+        {% if cycles_marked_paid %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>{% trans "System" %}</th>
+                <th>{% trans "Period" %}</th>
+                <th class="text-end">{% trans "Expected" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Due" %}</th>
+                <th>{% trans "Lead Character" %}</th>
+                <th>{% trans "Members" %}</th>
+                <th>{% trans "User Marked" %}</th>
+                <th class="text-end">{% trans "Actions" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cycles_marked_paid %}
+              <tr>
+<td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
+                <td>{{ c.period_start|date:"M Y" }}</td>
+                <td class="text-end">{{ c.expected_fmt }} ISK</td>
+                <td>
+                  {% if c.status == 'OVERDUE' %}
+                    <span class="badge bg-danger">{{ c.get_status_display }}</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ c.due_date|date:"M j, Y" }}</td>
+                <td>
+                  {% if c.system_ownership.primary_user %}
+                    <span class="badge bg-primary">{{ c.system_ownership.primary_user.username }}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted text-break">
+                  {% with members=c.system_ownership.auth_group.group.user_set.all %}
+                    {% if members %}
+                      {% for u in members %}
+                        {% if forloop.counter <= 4 %}
+                          {{ u.username }}{% if not forloop.last and forloop.counter < 4 %}, {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                      {% if members|length > 4 %}&nbsp;…{% endif %}
+                    {% else %}
+                      -
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td>
+                  {% if c.user_marked_paid %}
+                    <span class="badge bg-success">{% trans "Yes" %}</span>
+                    {% if c.user_marked_paid_at %}<br><span class="text-muted small">{{ c.user_marked_paid_at|date:"Y-m-d H:i" }}</span>{% endif %}
+                  {% else %}
+                    <span class="badge bg-secondary">{% trans "No" %}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark Paid" %}</button>
+                  </form>
+                  <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
+                  </form>
+                  <button class="btn btn-sm btn-outline-secondary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#logs-out-{{ c.pk }}" aria-expanded="false" aria-controls="logs-out-{{ c.pk }}">
+                    {% trans "Logs" %}
+                  </button>
+                </td>
+              </tr>
+              <tr class="collapse" id="logs-out-{{ c.pk }}">
+                <td colspan="9">
+                  <div class="p-2 bg-light border rounded">
+                    {% include "isksync/partials/audit_logs_list.html" with logs=c.recent_logs %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="text-muted">{% trans "None marked by users yet." %}</div>
+        {% endif %}
+      </div>
+</div>
+
+<div class="col-12 mt-3">
+  <div class="card">
+    <div class="card-header">
+      <span class="fw-bold">{% trans "Pending/Overdue (Not Marked Paid)" %}</span>
+    </div>
+    <div class="card-body">
+      {% if cycles_unmarked %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Period" %}</th>
+              <th class="text-end">{% trans "Expected" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th>{% trans "Due" %}</th>
+              <th>{% trans "Lead Character" %}</th>
+              <th>{% trans "Members" %}</th>
+              <th class="text-end">{% trans "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in cycles_unmarked %}
+            <tr>
+<td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
+              <td>{{ c.period_start|date:"M Y" }}</td>
+              <td class="text-end">{{ c.expected_fmt }} ISK</td>
+              <td>
+                {% if c.status == 'OVERDUE' %}
+                  <span class="badge bg-danger">{{ c.get_status_display }}</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>{{ c.due_date|date:"M j, Y" }}</td>
+              <td>
+                {% if c.system_ownership.primary_user %}
+                  <span class="badge bg-primary">{{ c.system_ownership.primary_user.username }}</span>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted text-break">
+                {% with members=c.system_ownership.auth_group.group.user_set.all %}
+                  {% if members %}
+                    {% for u in members %}
+                      {% if forloop.counter <= 4 %}
+                        {{ u.username }}{% if not forloop.last and forloop.counter < 4 %}, {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if members|length > 4 %}&nbsp;…{% endif %}
+                  {% else %}
+                    -
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td class="text-end">
+                <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark Paid" %}</button>
+                </form>
+                <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-2">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="text-muted">{% trans "No pending cycles without a user mark." %}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+
+<!-- Outstanding Obligations -->
+<div class="col-12 mt-3">
+  <div class="card">
+    <div class="card-header">
+      <span class="fw-bold">{% trans "Outstanding Obligations" %}</span>
+    </div>
+    <div class="card-body">
+      {% if obligations_outstanding %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "System" %}</th>
+              <th>{% trans "Period" %}</th>
+              <th>{% trans "Obligation" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th>{% trans "Due" %}</th>
+              <th class="text-end">{% trans "Actions" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for o in obligations_outstanding %}
+            <tr>
+              <td>{{ o.tax_cycle.system_ownership.system.name }}</td>
+              <td>{{ o.tax_cycle.period_start|date:"M Y" }}</td>
+              <td class="fw-semibold">{{ o.obligation_type.name }}</td>
+              <td>
+                {% if o.status == 'FAILED' %}
+                  <span class="badge bg-danger">{% trans "Failed" %}</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
+                {% endif %}
+              </td>
+              <td>{{ o.tax_cycle.due_date|date:"M j, Y" }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="complete" />
+                  <button type="submit" class="btn btn-sm btn-success">{% trans "Mark Completed" %}</button>
+                </form>
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="fail" />
+                  <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Mark Failed" %}</button>
+                </form>
+                {% if o.status == 'FAILED' %}
+                <form method="post" action="{% url 'isksync:admin_toggle_obligation' o.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="pending" />
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">{% trans "Set Pending" %}</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="text-muted">{% trans "No outstanding obligations." %}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="col-12 mt-3">
+  <div class="card">
+    <div class="card-header">
+      <span class="fw-bold">{% trans "Recent Activity" %}</span>
+    </div>
+    <div class="card-body">
+      {% include "isksync/partials/audit_logs_list.html" with logs=recent_logs %}
+    </div>
+  </div>
+</div>
+
+</div>
+{% endblock %}
