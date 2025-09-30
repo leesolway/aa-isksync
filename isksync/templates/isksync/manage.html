@@ -219,6 +219,7 @@
           <thead>
             <tr>
               <th>{% trans "System" %}</th>
+              <th>{% trans "Group" %}</th>
               <th>{% trans "Period" %}</th>
               <th>{% trans "Obligation" %}</th>
               <th>{% trans "Status" %}</th>
@@ -229,7 +230,8 @@
           <tbody>
             {% for o in obligations_outstanding %}
             <tr>
-              <td>{{ o.tax_cycle.system_ownership.system.name }}</td>
+              <td><a href="{% url 'isksync:ownership_detail' o.tax_cycle.system_ownership.pk %}">{{ o.tax_cycle.system_ownership.system.name }}</a></td>
+              <td>{% if o.tax_cycle.system_ownership.auth_group %}{{ o.tax_cycle.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
               <td>{{ o.tax_cycle.period_start|date:"M Y" }}</td>
               <td class="fw-semibold">{{ o.obligation_type.name }}</td>
               <td>

@@ -172,6 +172,7 @@
           <thead>
             <tr>
               <th>{% trans "System" %}</th>
+              <th>{% trans "Group" %}</th>
               <th>{% trans "Period" %}</th>
               <th>{% trans "Obligation" %}</th>
               <th>{% trans "Status" %}</th>
@@ -183,6 +184,7 @@
               {% with cycle=row.cycle obligation=row.obligation %}
               <tr>
 <td><a href="{% url 'isksync:ownership_detail' cycle.system_ownership.pk %}">{{ cycle.system_ownership.system.name }}</a></td>
+                <td>{% if cycle.system_ownership.auth_group %}{{ cycle.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
                 <td>{{ cycle.period_start|date:"M Y" }}</td>
                 <td class="fw-semibold">{{ obligation.obligation_type.name }}</td>
                 <td>
