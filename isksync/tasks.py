@@ -7,11 +7,12 @@ from django.db import transaction
 
 from .models import SystemOwnership, TaxCycle, SystemObligationType, TaxCycleObligation
 from .discord_notifications import process_all_tax_cycle_notifications
+from .constants import TAXCYCLE_STATUS_PENDING
 
 logger = logging.getLogger(__name__)
 
 
-def _ensure_cycle_obligations(cycle: TaxCycle) -> int:
+def _ensure_cycle_obligations(cycle):
     """Ensure TaxCycleObligation rows exist for active system obligations.
     Returns the number of obligations created.
     Idempotent: will not duplicate existing rows.
@@ -32,11 +33,11 @@ def _ensure_cycle_obligations(cycle: TaxCycle) -> int:
     return created
 
 
-def _first_of_month(d: date) -> date:
+def _first_of_month(d):
     return date(d.year, d.month, 1)
 
 
-def _next_month(d: date) -> date:
+def _next_month(d):
     if d.month == 12:
         return date(d.year + 1, 1, 1)
     return date(d.year, d.month + 1, 1)
@@ -45,12 +46,12 @@ def _next_month(d: date) -> date:
 @shared_task
 def generate_monthly_tax_cycles():
     """
-    Generate any missing monthly TaxCycle rows up to and including next month.
+    Generate any missing monthly TaxCycle rows up to and including the current month.
     The task is idempotent and relies on the existence check per month.
     """
     today = date.today()
 
-    logger.info("Running monthly tax cycle generation (backfilling missing months up to next month).")
+    logger.info("Running monthly tax cycle generation (backfilling missing months up to current month).")
 
     # Compute current month start; cycles are due at end of the same month (no grace)
     current_month_start = _first_of_month(today)
@@ -65,20 +66,21 @@ def generate_monthly_tax_cycles():
 
     for system_ownership in active_systems:
         try:
-            # Determine earliest month to consider: earliest existing cycle, else current month
-            earliest_cycle = (
+            # Always ensure we process the current month
+            # Find the earliest month that needs processing
+            earliest_existing = (
                 TaxCycle.objects.filter(system_ownership=system_ownership)
                 .order_by("period_start")
                 .values_list("period_start", flat=True)
                 .first()
             )
 
-            # If nothing exists at all, start at current month by default
-            start_month = earliest_cycle or current_month_start
-
-            # Iterate month by month through end (next month inclusive)
-            iter_month = _first_of_month(start_month)
+            # Start from earliest existing cycle, or current month if no cycles exist
+            start_month = _first_of_month(earliest_existing) if earliest_existing else current_month_start
+            # Always end at current month (inclusive)
             end_month = current_month_start
+            
+            iter_month = start_month
 
             while iter_month <= end_month:
                 last_day = monthrange(iter_month.year, iter_month.month)[1]
@@ -110,7 +112,7 @@ def generate_monthly_tax_cycles():
                                     period_start=period_start,
                                     period_end=period_end,
                                     due_date=due_date,
-                                    status="PENDING",
+                                    status=TAXCYCLE_STATUS_PENDING,
                                     target_amount=amount,
                                     notes=f"Auto-generated cycle for {period_start.strftime('%B %Y')}",
                                 )
@@ -144,8 +146,7 @@ def generate_monthly_tax_cycles():
         "obligations_created": obligations_created,
         "total_systems": active_systems.count(),
         "run_date": today.isoformat(),
-        "range_start": str(current_month_start),
-        "range_end": str(current_month_start),
+        "range_description": f"Up to and including {current_month_start.strftime('%B %Y')}",
     }
 
 

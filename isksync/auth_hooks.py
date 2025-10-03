@@ -26,7 +26,7 @@ def register_isksync_dashboard():
             tc_qs = TaxCycle.objects.select_related("system_ownership", "system_ownership__system").filter(system_ownership__in=so_qs)
 
             outstanding = (
-                tc_qs.filter(status__in=["PENDING", "OVERDUE"])\
+                tc_qs.filter(status="PENDING")\
                     .order_by("due_date", "system_ownership__system__name")[:5]
             )
 

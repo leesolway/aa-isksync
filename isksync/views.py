@@ -3,18 +3,25 @@ from typing import List
 from datetime import timedelta
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
-from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType
 
 from .models import SystemOwnership, TaxCycle, TaxCycleObligation, ObligationType, AuditLog
 from .audit import log_action
+from .constants import (
+    TAXCYCLE_STATUS_PENDING,
+    TAXCYCLE_STATUS_PAID,
+    TAXCYCLE_STATUS_WRITTEN_OFF,
+    OBLIGATION_STATUS_PENDING,
+    OBLIGATION_STATUS_FAILED,
+    OBLIGATION_STATUS_COMPLETED,
+)
 
 
 def _fmt_isk_short(amount: Decimal | None) -> str:
@@ -73,7 +80,7 @@ class MyDueTaxesView(TemplateView):
         cycles_qs = (
             TaxCycle.objects.select_related("system_ownership", "system_ownership__system")
             .prefetch_related("obligations__obligation_type")
-            .filter(system_ownership__in=systems, status__in=["PENDING", "OVERDUE"])
+            .filter(system_ownership__in=systems, status=TAXCYCLE_STATUS_PENDING)
             .order_by("due_date", "system_ownership__system__name")
         )
         cycles = list(cycles_qs)
@@ -82,7 +89,7 @@ class MyDueTaxesView(TemplateView):
             c.paid_fmt = "-" if c.paid_amount is None else _fmt_isk_short(c.paid_amount)
             try:
                 c.outstanding_obligations = [
-                    o for o in c.obligations.all() if getattr(o, "status", "PENDING") in ("PENDING", "FAILED")
+                    o for o in c.obligations.all() if getattr(o, "status", OBLIGATION_STATUS_PENDING) in (OBLIGATION_STATUS_PENDING, OBLIGATION_STATUS_FAILED)
                 ]
             except Exception:
                 c.outstanding_obligations = []
@@ -117,7 +124,7 @@ class MyPaymentHistoryView(TemplateView):
         cycles_qs = (
             TaxCycle.objects.select_related("system_ownership", "system_ownership__system")
             .prefetch_related("obligations__obligation_type")
-            .filter(system_ownership__in=systems, status__in=["PAID", "WRITTEN_OFF"])
+            .filter(system_ownership__in=systems, status__in=[TAXCYCLE_STATUS_PAID, TAXCYCLE_STATUS_WRITTEN_OFF])
             .order_by("-period_start")
         )
         cycles = list(cycles_qs)
@@ -133,7 +140,7 @@ class MyPaymentHistoryView(TemplateView):
             )
             .filter(
                 tax_cycle__system_ownership__in=systems,
-                status__in=["COMPLETED", "FAILED"],
+                status__in=[OBLIGATION_STATUS_COMPLETED, OBLIGATION_STATUS_FAILED],
             )
             .order_by("-tax_cycle__period_start", "obligation_type__name")
         )
@@ -172,7 +179,7 @@ class ManageView(TemplateView):
                 "system_ownership__auth_group__group__user_set",
                 "obligations__obligation_type",
             )
-            .filter(status__in=["PENDING", "OVERDUE"])
+            .filter(status=TAXCYCLE_STATUS_PENDING)
         )
 
         cycles_marked_paid = list(
@@ -190,7 +197,7 @@ class ManageView(TemplateView):
                 "tax_cycle__system_ownership__system",
                 "obligation_type",
             )
-            .filter(tax_cycle__status__in=["PENDING", "OVERDUE"], status__in=["PENDING", "FAILED"])
+            .filter(tax_cycle__status=TAXCYCLE_STATUS_PENDING, status__in=[OBLIGATION_STATUS_PENDING, OBLIGATION_STATUS_FAILED])
             .order_by("tax_cycle__due_date", "tax_cycle__system_ownership__system__name", "obligation_type__name")
         )
 
@@ -284,7 +291,7 @@ class ManageAllObligationsView(TemplateView):
             .order_by("-tax_cycle__period_start", "tax_cycle__system_ownership__system__name", "obligation_type__name")
         )
         status = (self.request.GET.get("status") or "").upper()
-        if status in {"PENDING", "COMPLETED", "FAILED"}:
+        if status in {OBLIGATION_STATUS_PENDING, OBLIGATION_STATUS_COMPLETED, OBLIGATION_STATUS_FAILED}:
             qs = qs.filter(status=status)
         ctx.update({
             "page_title": "All Obligations",
@@ -383,7 +390,7 @@ def mark_cycle_paid(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return redirect("isksync:manage")
     cycle = get_object_or_404(TaxCycle, pk=pk)
-    cycle.mark_paid()
+    cycle.set_status_paid()
     log_action(
         user=request.user,
         action="cycle_mark_paid",
@@ -395,6 +402,34 @@ def mark_cycle_paid(request: HttpRequest, pk: int) -> HttpResponse:
         request=request,
     )
     messages.success(request, f"Marked paid: {cycle}")
+    return HttpResponseRedirect(request.META.get("HTTP_REFERER") or reverse("isksync:manage"))
+
+
+@login_required
+def clear_user_mark_paid(request: HttpRequest, pk: int) -> HttpResponse:
+    """Manager clears user's self-reported payment mark without changing official status"""
+    if not _can_manage(request.user):
+        return HttpResponseForbidden("Not allowed")
+    if request.method != "POST":
+        return redirect("isksync:manage")
+
+    cycle = get_object_or_404(TaxCycle, pk=pk)
+    
+    if cycle.user_marked_paid:
+        cycle.unmark_as_paid_by_user()
+        log_action(
+            user=request.user,
+            action="admin_clear_user_mark_paid",
+            target=cycle,
+            details={
+                "official_status_unchanged": cycle.status,
+            },
+            request=request,
+        )
+        messages.success(request, f"Cleared user payment mark for {cycle} (official status unchanged)")
+    else:
+        messages.info(request, f"No user payment mark to clear for {cycle}")
+    
     return HttpResponseRedirect(request.META.get("HTTP_REFERER") or reverse("isksync:manage"))
 
 
@@ -559,7 +594,7 @@ def exempt_cycle(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         return redirect("isksync:manage")
     cycle = get_object_or_404(TaxCycle, pk=pk)
-    cycle.write_off(notes="Exempted via frontend")
+    cycle.set_status_written_off(notes="Exempted via frontend")
     log_action(
         user=request.user,
         action="cycle_write_off",
@@ -583,20 +618,18 @@ def toggle_user_marked_paid(request: HttpRequest, pk: int) -> HttpResponse:
         system_ownership__in=systems,
     )
 
-    cycle.user_marked_paid = not cycle.user_marked_paid
-    if cycle.user_marked_paid:
-        cycle.user_marked_paid_at = timezone.now()
+    was_marked = cycle.toggle_user_mark_paid()
+    
+    if was_marked:
         messages.success(
             request,
             f"Marked as paid for {cycle.system_ownership.system.name} period {cycle.period_start:%b %Y} (now completed).",
         )
     else:
-        cycle.user_marked_paid_at = None
         messages.info(
             request,
             f"Cleared 'marked as paid' for {cycle.system_ownership.system.name} ({cycle.period_start:%b %Y}).",
         )
-    cycle.save(update_fields=["user_marked_paid", "user_marked_paid_at", "updated_at"])
 
     from_date = cycle.user_marked_paid_at.isoformat() if cycle.user_marked_paid_at else None
     log_action(
@@ -624,16 +657,14 @@ def mark_cycle_pending(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("isksync:manage")
 
     cycle = get_object_or_404(TaxCycle, pk=pk)
-    cycle.status = "PENDING"
-    cycle.paid_amount = None
-    cycle.paid_date = None
-    cycle.save(update_fields=["status", "paid_amount", "paid_date", "updated_at"])
+    previous_status = cycle.status
+    cycle.set_status_pending(clear_user_flags=True)
     log_action(
         user=request.user,
         action="cycle_set_pending",
         target=cycle,
-        details={},
+        details={"previous_status": previous_status},
         request=request,
     )
-    messages.success(request, f"Set to pending: {cycle}.")
+    messages.success(request, f"Set to pending (unmarked as paid): {cycle}")
     return HttpResponseRedirect(request.META.get("HTTP_REFERER") or reverse("isksync:manage"))

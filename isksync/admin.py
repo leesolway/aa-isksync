@@ -348,11 +348,15 @@ class TaxCycleAdmin(admin.ModelAdmin):
     paid_amount_formatted.admin_order_field = "paid_amount"
 
     def overdue_status(self, obj):
-        if obj.is_overdue:
+        timing_status = obj.payment_timing_status
+        if timing_status == "overdue":
             return format_html(
                 '<span style="color: #dc3545; font-weight: bold;">OVERDUE</span>'
             )
-        return format_html('<span style="color: #28a745;">On Time</span>')
+        elif timing_status in ["due_today", "due_soon"]:
+            return format_html('<span style="color: #ffc107; font-weight: bold;">DUE SOON</span>')
+        else:
+            return format_html('<span style="color: #28a745;">On Time</span>')
 
     overdue_status.short_description = "Payment Status"
 
@@ -372,9 +376,10 @@ class TaxCycleAdmin(admin.ModelAdmin):
         )
 
     actions = [
-        "mark_as_paid",
-        "mark_as_overdue",
-        "write_off_selected",
+        "set_status_paid",
+        "set_status_pending",
+        "clear_user_mark_paid",
+        "set_status_written_off",
         "send_discord_reminder_advance",
         "send_discord_reminder_due",
         "send_discord_reminder_overdue",
@@ -541,7 +546,7 @@ class TaxCycleAdmin(admin.ModelAdmin):
     
     send_test_discord_notifications.short_description = "Send BATCHED test Discord notifications"
 
-    def mark_as_paid(self, request, queryset):
+    def set_status_paid(self, request, queryset):
         if queryset.count() > 100:
             self.message_user(
                 request,
@@ -552,8 +557,8 @@ class TaxCycleAdmin(admin.ModelAdmin):
 
         count = 0
         for cycle in queryset:
-            if cycle.status in ["PENDING", "OVERDUE"]:
-                cycle.mark_paid()
+            if cycle.can_be_set_to_paid():
+                cycle.set_status_paid()
                 log_action(
                     user=request.user,
                     action="admin_mark_cycle_paid",
@@ -572,9 +577,9 @@ class TaxCycleAdmin(admin.ModelAdmin):
                 count += 1
         self.message_user(request, f"{count} cycles were marked as paid.")
 
-    mark_as_paid.short_description = "Mark selected cycles as paid"
+    set_status_paid.short_description = "Set status to PAID"
 
-    def mark_as_overdue(self, request, queryset):
+    def set_status_pending(self, request, queryset):
         if queryset.count() > 100:
             self.message_user(
                 request,
@@ -585,20 +590,24 @@ class TaxCycleAdmin(admin.ModelAdmin):
 
         count = 0
         for cycle in queryset:
-            if cycle.status == "PENDING":
-                cycle.mark_overdue()
+            if cycle.can_be_set_to_pending():
+                previous_status = cycle.status
+                cycle.set_status_pending(clear_user_flags=True)
                 log_action(
                     user=request.user,
-                    action="admin_mark_cycle_overdue",
+                    action="admin_mark_cycle_pending",
                     target=cycle,
-                    details={},
+                    details={
+                        "previous_status": previous_status,
+                        "cleared_user_marked": True,
+                    },
                 )
                 count += 1
-        self.message_user(request, f"{count} cycles were marked as overdue.")
+        self.message_user(request, f"{count} cycles were set to pending (unmarked as paid).")
 
-    mark_as_overdue.short_description = "Mark selected cycles as overdue"
+    set_status_pending.short_description = "Set status to PENDING"
 
-    def write_off_selected(self, request, queryset):
+    def clear_user_mark_paid(self, request, queryset):
         if queryset.count() > 100:
             self.message_user(
                 request,
@@ -609,8 +618,35 @@ class TaxCycleAdmin(admin.ModelAdmin):
 
         count = 0
         for cycle in queryset:
-            if cycle.status != "WRITTEN_OFF":
-                cycle.write_off()
+            if cycle.user_marked_paid:
+                cycle.unmark_as_paid_by_user()
+                log_action(
+                    user=request.user,
+                    action="admin_clear_user_mark_paid_bulk",
+                    target=cycle,
+                    details={
+                        "official_status_unchanged": cycle.status,
+                    },
+                )
+                count += 1
+        self.message_user(request, f"{count} user payment marks were cleared (official status unchanged).")
+
+    clear_user_mark_paid.short_description = "Clear user payment marks"
+
+
+    def set_status_written_off(self, request, queryset):
+        if queryset.count() > 100:
+            self.message_user(
+                request,
+                "Too many records selected. Please select 100 or fewer.",
+                level=messages.ERROR,
+            )
+            return
+
+        count = 0
+        for cycle in queryset:
+            if cycle.can_be_written_off():
+                cycle.set_status_written_off()
                 log_action(
                     user=request.user,
                     action="admin_write_off_cycle",
@@ -620,7 +656,7 @@ class TaxCycleAdmin(admin.ModelAdmin):
                 count += 1
         self.message_user(request, f"{count} cycles were written off.")
 
-    write_off_selected.short_description = "Write off selected cycles"
+    set_status_written_off.short_description = "Set status to WRITTEN OFF"
 
 
 @admin.register(ObligationType)

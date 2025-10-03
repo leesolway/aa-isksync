@@ -22,7 +22,7 @@
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <span class="fw-bold">{% trans "Marked Paid (Pending/Overdue)" %}</span>
+        <span class="fw-bold">{% trans "User Marked Paid - Status Pending" %}</span>
       </div>
       <div class="card-body">
         {% if cycles_marked_paid %}
@@ -50,11 +50,7 @@
                 <td>{{ c.period_start|date:"M Y" }}</td>
                 <td class="text-end">{{ c.expected_fmt }} ISK</td>
                 <td>
-                  {% if c.status == 'OVERDUE' %}
-                    <span class="badge bg-danger">{{ c.get_status_display }}</span>
-                  {% else %}
-                    <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
-                  {% endif %}
+                  <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
                 </td>
                 <td>{{ c.due_date|date:"M j, Y" }}</td>
                 <td>
@@ -91,22 +87,47 @@
                   {% endif %}
                 </td>
                 <td class="text-end">
+                  {% if c.can_be_set_to_paid and not c.user_marked_paid %}
                   <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark Paid" %}</button>
                   </form>
-                  <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-2">
+                  {% elif c.can_be_set_to_paid and c.user_marked_paid %}
+                  <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-success">{% trans "Accept Payment" %}</button>
+                  </form>
+                  {% endif %}
+                  
+                  {% if c.user_marked_paid %}
+                  <form method="post" action="{% url 'isksync:clear_user_mark_paid' c.pk %}" class="d-inline ms-1">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-info" title="{% trans 'Clear user payment claim (keep official status)' %}">{% trans "Clear Mark" %}</button>
+                  </form>
+                  {% endif %}
+                  
+                  {% if c.can_be_set_to_pending %}
+                  <form method="post" action="{% url 'isksync:mark_cycle_pending' c.pk %}" class="d-inline ms-1">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-warning" title="{% trans 'Reset official status to PENDING and clear user marks' %}">{% trans "Set Pending" %}</button>
+                  </form>
+                  {% endif %}
+                  
+                  {% if c.can_be_written_off %}
+                  <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-1">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
                   </form>
-                  <button class="btn btn-sm btn-outline-secondary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#logs-out-{{ c.pk }}" aria-expanded="false" aria-controls="logs-out-{{ c.pk }}">
+                  {% endif %}
+                  
+                  <button class="btn btn-sm btn-outline-tertiary ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#logs-out-{{ c.pk }}" aria-expanded="false" aria-controls="logs-out-{{ c.pk }}">
                     {% trans "Logs" %}
                   </button>
                 </td>
               </tr>
               <tr class="collapse" id="logs-out-{{ c.pk }}">
                 <td colspan="10">
-                  <div class="p-2 bg-light border rounded">
+                  <div class="p-2">
                     {% include "isksync/partials/audit_logs_list.html" with logs=c.recent_logs %}
                   </div>
                 </td>
@@ -124,7 +145,7 @@
 <div class="col-12 mt-3">
   <div class="card">
     <div class="card-header">
-      <span class="fw-bold">{% trans "Pending/Overdue (Not Marked Paid)" %}</span>
+      <span class="fw-bold">{% trans "Unmarked - Status Pending" %}</span>
     </div>
     <div class="card-body">
       {% if cycles_unmarked %}
@@ -151,11 +172,7 @@
               <td>{{ c.period_start|date:"M Y" }}</td>
               <td class="text-end">{{ c.expected_fmt }} ISK</td>
               <td>
-                {% if c.status == 'OVERDUE' %}
-                  <span class="badge bg-danger">{{ c.get_status_display }}</span>
-                {% else %}
-                  <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
-                {% endif %}
+                <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
               </td>
               <td>{{ c.due_date|date:"M j, Y" }}</td>
               <td>
@@ -184,14 +201,26 @@
                 {% endwith %}
               </td>
               <td class="text-end">
+                {% if c.can_be_set_to_paid %}
                 <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark Paid" %}</button>
                 </form>
-                <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-2">
+                {% endif %}
+                
+                {% if c.can_be_set_to_pending %}
+                <form method="post" action="{% url 'isksync:mark_cycle_pending' c.pk %}" class="d-inline ms-1">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-warning">{% trans "Set Pending" %}</button>
+                </form>
+                {% endif %}
+                
+                {% if c.can_be_written_off %}
+                <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-1">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
                 </form>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

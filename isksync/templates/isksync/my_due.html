@@ -77,18 +77,20 @@
   </div>
 </div>
 
-<!-- Outstanding Payments Section -->
+<!-- Payments Section -->
 <div class="card mb-4">
   <div class="card-header">
     <h5 class="mb-0">
       <i class="fa-solid fa-credit-card me-2"></i>
-      {% trans "Outstanding Payments" %}
+      {% trans "Payments" %}
     </h5>
   </div>
   <div class="card-body">
     <div class="alert alert-info mb-3">
       <i class="fa-solid fa-info-circle me-2"></i>
       {% trans "Payments are created on the 1st and are due by the end of the current period." %}
+      <br><strong>💡 {% trans "Tip:" %}</strong> {% trans "You don't need to pay immediately when a cycle appears - wait until the payment window opens (within 7 days of due date)." %}
+      <br><strong>💡 {% trans "Tip:" %}</strong> {% trans "When making payments, include the system name and period in the description (e.g., 'Farm L - Sep 2025') to match the Period column below." %}
     </div>
     
     {% if cycles %}
@@ -99,7 +101,7 @@
               <th>{% trans "System" %}</th>
               <th>{% trans "Period" %}</th>
               <th class="text-end">{% trans "Expected" %}</th>
-              <th>{% trans "Status" %}</th>
+              <th>{% trans "Payment Timing" %}</th>
               <th>{% trans "Due Date" %}</th>
               <th class="text-end">{% trans "Mark as Paid" %}</th>
             </tr>
@@ -113,16 +115,24 @@
                 <td>{{ c.period_start|date:"M Y" }}</td>
                 <td class="text-end">{{ c.expected_fmt }} ISK</td>
                 <td>
-                  {% if c.status == 'OVERDUE' %}
-                    <span class="badge bg-danger">{{ c.get_status_display }}</span>
-                  {% elif c.status == 'PENDING' %}
-                    <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
-                  {% else %}
-                    <span class="badge bg-secondary">{{ c.get_status_display }}</span>
-                  {% endif %}
+                  {% with timing_status=c.payment_timing_status %}
+                    {% if timing_status == 'overdue' %}
+                      <span class="badge bg-danger">{{ c.payment_timing_message }}</span>
+                    {% elif timing_status == 'due_today' %}
+                      <span class="badge bg-danger">{{ c.payment_timing_message }}</span>
+                    {% elif timing_status == 'due_soon' %}
+                      <span class="badge bg-warning text-dark">{{ c.payment_timing_message }}</span>
+                    {% elif timing_status == 'payment_time' %}
+                      <span class="badge bg-success">{{ c.payment_timing_message }}</span>
+                    {% elif timing_status == 'too_early' %}
+                      <span class="badge bg-secondary">{{ c.payment_timing_message }}</span>
+                    {% else %}
+                      <span class="badge bg-info">{{ c.payment_timing_message }}</span>
+                    {% endif %}
+                  {% endwith %}
                 </td>
                 <td>
-                  {% if c.is_overdue %}
+                  {% if c.payment_timing_status == 'overdue' %}
                     <span class="text-danger fw-bold">{{ c.due_date|date:"M j, Y" }}</span>
                   {% else %}
                     {{ c.due_date|date:"M j, Y" }}
@@ -137,7 +147,9 @@
                         <button class="btn btn-sm btn-outline-secondary" type="submit">{% trans "Undo" %}</button>
                       </div>
                     {% else %}
-                      <button class="btn btn-sm btn-success" type="submit">{% trans "I've paid for this period" %}</button>
+                      {% if c.can_user_mark_paid %}
+                        <button class="btn btn-sm btn-success" type="submit">{% trans "I've paid for this period" %}</button>
+                      {% endif %}
                     {% endif %}
                   </form>
                 </td>

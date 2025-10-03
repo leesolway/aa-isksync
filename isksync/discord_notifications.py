@@ -17,6 +17,11 @@ from .models import (
     DiscordNotificationLog,
     TaxCycle,
 )
+from .constants import (
+    TAXCYCLE_STATUS_PENDING,
+    OBLIGATION_STATUS_PENDING,
+    OBLIGATION_STATUS_FAILED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +63,7 @@ def _add_discord_group_pings(system_ownership) -> str:
         logger.debug("Discord service not available - skipping group pings")
         return ""
     
-    groups = system_ownership.ping_groups.all()
+    groups = system_ownership.ping_groups.all().order_by('name')
     content = ""
     
     for group in groups:
@@ -115,7 +120,7 @@ def determine_notification_type(
 
     # OVERDUE
     if days_until_due < 0:
-        if (not respect_config_flags or config.send_overdue_notice) and cycle.status in ["PENDING", "OVERDUE"]:
+        if (not respect_config_flags or config.send_overdue_notice) and cycle.status == TAXCYCLE_STATUS_PENDING:
             return "OVERDUE"
         return None
 
@@ -212,7 +217,7 @@ def create_discord_embed(
     
     # Add obligations if any
     if hasattr(tax_cycle, 'obligations') and tax_cycle.obligations.exists():
-        outstanding_obligations = tax_cycle.obligations.filter(status__in=["PENDING", "FAILED"])
+        outstanding_obligations = tax_cycle.obligations.filter(status__in=[OBLIGATION_STATUS_PENDING, OBLIGATION_STATUS_FAILED])
         if outstanding_obligations.exists():
             obligation_names = [obj.obligation_type.name for obj in outstanding_obligations]
             embed["fields"].append({
@@ -474,7 +479,8 @@ def send_batched_discord_notification(
                 if apps.is_installed('allianceauth.services.modules.discord'):
                     DiscordUser = _import_discord_user()
                     if DiscordUser:
-                        for group in all_ping_groups:
+                        sorted_groups = sorted(all_ping_groups, key=lambda g: g.name)
+                        for group in sorted_groups:
                             try:
                                 role = DiscordUser.objects.group_to_role(group)
                                 if role:
@@ -536,11 +542,13 @@ def process_all_tax_cycle_notifications() -> Dict[str, int]:
         summary["config_found"] = True
         
         # Get all tax cycles that might need notifications
+        # Exclude cycles where users have already marked as paid
         tax_cycles = TaxCycle.objects.select_related(
             'system_ownership',
             'system_ownership__system'
         ).filter(
-            status__in=["PENDING", "OVERDUE"]
+            status=TAXCYCLE_STATUS_PENDING,
+            user_marked_paid=False
         )
         
         summary["cycles_checked"] = tax_cycles.count()

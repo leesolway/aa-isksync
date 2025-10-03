@@ -14,6 +14,7 @@ urlpatterns = [
     path("manage/obligations/", views.ManageAllObligationsView.as_view(), name="manage_all_obligations"),
     path("manage/cycle/<int:pk>/mark-paid/", views.mark_cycle_paid, name="mark_cycle_paid"),
     path("manage/cycle/<int:pk>/set-pending/", views.mark_cycle_pending, name="mark_cycle_pending"),
+    path("manage/cycle/<int:pk>/clear-user-mark/", views.clear_user_mark_paid, name="clear_user_mark_paid"),
     path("manage/cycle/<int:pk>/exempt/", views.exempt_cycle, name="exempt_cycle"),
     path("manage/obligation/<int:pk>/toggle/", views.admin_toggle_obligation, name="admin_toggle_obligation"),
 ]

@@ -27,7 +27,6 @@
         <select class="form-select" id="status" name="status" onchange="this.form.submit()">
           <option value="">{% trans "All" %}</option>
           <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>PENDING</option>
-          <option value="OVERDUE" {% if request.GET.status == 'OVERDUE' %}selected{% endif %}>OVERDUE</option>
           <option value="PAID" {% if request.GET.status == 'PAID' %}selected{% endif %}>PAID</option>
           <option value="WRITTEN_OFF" {% if request.GET.status == 'WRITTEN_OFF' %}selected{% endif %}>WRITTEN_OFF</option>
         </select>
@@ -70,9 +69,7 @@
                 <td>{{ c.period_start|date:"M Y" }}</td>
                 <td class="text-end">{{ c.expected_fmt }} ISK</td>
                 <td>
-                  {% if c.status == 'OVERDUE' %}
-                    <span class="badge bg-danger">{{ c.get_status_display }}</span>
-                  {% elif c.status == 'PENDING' %}
+                  {% if c.status == 'PENDING' %}
                     <span class="badge bg-warning text-dark">{{ c.get_status_display }}</span>
                   {% elif c.status == 'PAID' %}
                     <span class="badge bg-success">{{ c.get_status_display }}</span>
@@ -82,12 +79,27 @@
                 </td>
                 <td>{{ c.due_date|date:"M j, Y" }}</td>
                 <td class="text-end">
+                  {% if c.can_be_set_to_paid %}
                   <form method="post" action="{% url 'isksync:mark_cycle_paid' c.pk %}" class="d-inline">{% csrf_token %}
-                    <button class="btn btn-sm btn-success" {% if c.status == 'PAID' %}disabled{% endif %}>{% trans "Mark Paid" %}</button>
+                    <button class="btn btn-sm btn-success">{% trans "Mark Paid" %}</button>
                   </form>
+                  {% endif %}
+                  
+                  {% if c.can_be_set_to_pending %}
+                  <form method="post" action="{% url 'isksync:mark_cycle_pending' c.pk %}" class="d-inline ms-1">{% csrf_token %}
+                    <button class="btn btn-sm btn-outline-warning">{% trans "Set Pending" %}</button>
+                  </form>
+                  {% endif %}
+                  
+                  {% if c.can_be_written_off %}
                   <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-1">{% csrf_token %}
-                    <button class="btn btn-sm btn-outline-danger" {% if c.status == 'WRITTEN_OFF' %}disabled{% endif %}>{% trans "Write Off" %}</button>
+                    <button class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
                   </form>
+                  {% endif %}
+                  
+                  {% if not c.can_be_set_to_paid and not c.can_be_set_to_pending and not c.can_be_written_off %}
+                    <span class="text-muted small">{% trans "No actions available" %}</span>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
