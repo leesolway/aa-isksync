@@ -9,6 +9,7 @@ urlpatterns = [
     path("cycle/<int:pk>/toggle-paid/", views.toggle_user_marked_paid, name="toggle_user_marked_paid"),
     path("obligation/<int:pk>/toggle/", views.toggle_obligation_fulfilled, name="toggle_obligation_fulfilled"),
     path("ownership/<int:pk>/", views.OwnershipDetailView.as_view(), name="ownership_detail"),
+    path("ownership/<int:pk>/edit/", views.OwnershipEditView.as_view(), name="ownership_edit"),
     path("manage/", views.ManageView.as_view(), name="manage"),
     path("manage/all/", views.ManageAllCyclesView.as_view(), name="manage_all"),
     path("manage/obligations/", views.ManageAllObligationsView.as_view(), name="manage_all_obligations"),

@@ -88,7 +88,9 @@ class SystemOwnership(BaseModel):
 
     auth_group = models.ForeignKey(
         AuthGroup,
-        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         help_text="Alliance Auth group that contains users with access to this system",
     )
 
@@ -434,6 +436,8 @@ class TaxCycle(BaseModel):
     @property
     def payment_timing_status(self):
         """Get a user-friendly status about when to pay"""
+        if self.status in (TAXCYCLE_STATUS_PAID, TAXCYCLE_STATUS_WRITTEN_OFF):
+            return "paid"
         days_until = self.days_until_due
         if days_until is None:
             return "due_unknown"
@@ -454,7 +458,11 @@ class TaxCycle(BaseModel):
         status = self.payment_timing_status
         days_until = self.days_until_due
         
-        if status == "overdue":
+        if status == "paid":
+            if self.status == TAXCYCLE_STATUS_WRITTEN_OFF:
+                return "✅ Written Off"
+            return "✅ Paid"
+        elif status == "overdue":
             days_overdue = abs(days_until)
             if days_overdue == 1:
                 return "⚠️ Overdue by 1 day"

@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+from itertools import groupby
 from typing import List
 from datetime import timedelta
 
@@ -9,11 +10,12 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, UpdateView
 from django.contrib.contenttypes.models import ContentType
 
 from .models import SystemOwnership, TaxCycle, TaxCycleObligation, ObligationType, AuditLog
 from .audit import log_action
+from .forms import SystemOwnershipForm
 from .constants import (
     TAXCYCLE_STATUS_PENDING,
     TAXCYCLE_STATUS_PAID,
@@ -227,11 +229,19 @@ class ManageView(TemplateView):
 
         recent_logs = AuditLog.objects.select_related("user").order_by("-created_at")[:50]
 
+        def _group_by_period(cycles):
+            grouped = []
+            for key, group in groupby(cycles, key=lambda c: c.period_start.strftime("%B %Y")):
+                grouped.append((key, list(group)))
+            return grouped
+
         ctx.update(
             {
                 "page_title": "Manage",
                 "cycles_marked_paid": cycles_marked_paid,
                 "cycles_unmarked": cycles_unmarked,
+                "cycles_marked_paid_grouped": _group_by_period(cycles_marked_paid),
+                "cycles_unmarked_grouped": _group_by_period(cycles_unmarked),
                 "obligations_outstanding": obligations_outstanding,
                 "recent_logs": recent_logs,
             }
@@ -381,6 +391,55 @@ class OwnershipDetailView(TemplateView):
             }
         )
         return ctx
+
+
+@method_decorator(login_required, name="dispatch")
+class OwnershipEditView(UpdateView):
+    model = SystemOwnership
+    form_class = SystemOwnershipForm
+    template_name = "isksync/ownership_edit.html"
+
+    def dispatch(self, request: HttpRequest, *args, **kwargs):
+        if not _can_manage(request.user):
+            return HttpResponseForbidden("You do not have access to this page.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return SystemOwnership.objects.select_related(
+            "system", "ownership_type", "primary_user", "auth_group__group",
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = f"Edit — {self.object.system.name}"
+        ctx["ownership"] = self.object
+        return ctx
+
+    def form_valid(self, form):
+        ownership = self.get_object()
+        changes = {}
+        for field_name in form.changed_data:
+            old_val = getattr(ownership, field_name)
+            new_val = form.cleaned_data[field_name]
+            # Convert to string representations for JSON serialisation
+            changes[field_name] = {
+                "old": str(old_val) if old_val is not None else None,
+                "new": str(new_val) if new_val is not None else None,
+            }
+        response = super().form_valid(form)
+        if changes:
+            log_action(
+                user=self.request.user,
+                action="ownership_edited",
+                target=self.object,
+                details={"changes": changes},
+                request=self.request,
+            )
+        messages.success(self.request, f"Ownership record for {self.object.system.name} updated.")
+        return response
+
+    def get_success_url(self):
+        return reverse("isksync:ownership_detail", kwargs={"pk": self.object.pk})
 
 
 @login_required

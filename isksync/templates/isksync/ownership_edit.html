@@ -1,0 +1,72 @@
+{% extends 'isksync/base.html' %}
+{% load i18n %}
+
+{% block page_title %}Edit — {{ ownership.system.name }}{% endblock %}
+
+{% block page_header %}
+  Edit — {{ ownership.system.name }}
+{% endblock %}
+
+{% block user_nav %}
+{% include "isksync/partials/back_button.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <span class="fw-bold">{% trans "Edit Ownership" %} — {{ ownership.system.name }}</span>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% for field in form %}
+            {% if field.name == "tax_active" %}
+            <div class="mb-3 form-check">
+              {{ field }}
+              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {% if field.errors %}
+                <div class="invalid-feedback d-block">{% for e in field.errors %}{{ e }}{% endfor %}</div>
+              {% endif %}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+            </div>
+            {% else %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}
+                <div class="invalid-feedback d-block">{% for e in field.errors %}{{ e }}{% endfor %}</div>
+              {% endif %}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+            </div>
+            {% endif %}
+          {% endfor %}
+
+          <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="fa-solid fa-floppy-disk me-1"></i> {% trans "Save" %}
+            </button>
+            <a href="{% url 'isksync:ownership_detail' ownership.pk %}" class="btn btn-outline-secondary">
+              {% trans "Cancel" %}
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

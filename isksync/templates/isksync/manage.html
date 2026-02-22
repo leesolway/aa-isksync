@@ -26,6 +26,8 @@
       </div>
       <div class="card-body">
         {% if cycles_marked_paid %}
+        {% for period_label, period_cycles in cycles_marked_paid_grouped %}
+        <h6 class="mt-3 mb-2 text-muted">{{ period_label }}</h6>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead>
@@ -43,7 +45,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for c in cycles_marked_paid %}
+              {% for c in period_cycles %}
               <tr>
 <td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
                 <td>{% if c.system_ownership.auth_group %}{{ c.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
@@ -98,28 +100,28 @@
                     <button type="submit" class="btn btn-sm btn-success">{% trans "Accept Payment" %}</button>
                   </form>
                   {% endif %}
-                  
+
                   {% if c.user_marked_paid %}
                   <form method="post" action="{% url 'isksync:clear_user_mark_paid' c.pk %}" class="d-inline ms-1">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-outline-info" title="{% trans 'Clear user payment claim (keep official status)' %}">{% trans "Clear Mark" %}</button>
                   </form>
                   {% endif %}
-                  
+
                   {% if c.can_be_set_to_pending %}
                   <form method="post" action="{% url 'isksync:mark_cycle_pending' c.pk %}" class="d-inline ms-1">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-outline-warning" title="{% trans 'Reset official status to PENDING and clear user marks' %}">{% trans "Set Pending" %}</button>
                   </form>
                   {% endif %}
-                  
+
                   {% if c.can_be_written_off %}
                   <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-1">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Write Off" %}</button>
                   </form>
                   {% endif %}
-                  
+
                   <button class="btn btn-sm btn-outline-tertiary ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#logs-out-{{ c.pk }}" aria-expanded="false" aria-controls="logs-out-{{ c.pk }}">
                     {% trans "Logs" %}
                   </button>
@@ -136,6 +138,7 @@
             </tbody>
           </table>
         </div>
+        {% endfor %}
         {% else %}
           <div class="text-muted">{% trans "None marked by users yet." %}</div>
         {% endif %}
@@ -149,6 +152,8 @@
     </div>
     <div class="card-body">
       {% if cycles_unmarked %}
+      {% for period_label, period_cycles in cycles_unmarked_grouped %}
+      <h6 class="mt-3 mb-2 text-muted">{{ period_label }}</h6>
       <div class="table-responsive">
         <table class="table table-sm align-middle">
           <thead>
@@ -165,7 +170,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for c in cycles_unmarked %}
+            {% for c in period_cycles %}
             <tr>
 <td><a href="{% url 'isksync:ownership_detail' c.system_ownership.pk %}">{{ c.system_ownership.system.name }}</a></td>
               <td>{% if c.system_ownership.auth_group %}{{ c.system_ownership.auth_group.group.name }}{% else %}-{% endif %}</td>
@@ -207,14 +212,14 @@
                   <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark Paid" %}</button>
                 </form>
                 {% endif %}
-                
+
                 {% if c.can_be_set_to_pending %}
                 <form method="post" action="{% url 'isksync:mark_cycle_pending' c.pk %}" class="d-inline ms-1">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-outline-warning">{% trans "Set Pending" %}</button>
                 </form>
                 {% endif %}
-                
+
                 {% if c.can_be_written_off %}
                 <form method="post" action="{% url 'isksync:exempt_cycle' c.pk %}" class="d-inline ms-1">
                   {% csrf_token %}
@@ -227,6 +232,7 @@
           </tbody>
         </table>
       </div>
+      {% endfor %}
       {% else %}
         <div class="text-muted">{% trans "No pending cycles without a user mark." %}</div>
       {% endif %}

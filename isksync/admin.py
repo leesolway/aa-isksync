@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from django import forms
 
 from .audit import log_action
+from .forms import UserModelChoiceField
 from .models import (
     AuditLog,
     DiscordNotificationConfig,
@@ -18,21 +19,6 @@ from .models import (
 )
 
 User = get_user_model()
-
-
-class UserModelChoiceField(forms.ModelChoiceField):
-    """Custom ModelChoiceField that displays main character names in dropdowns"""
-    
-    def label_from_instance(self, obj):
-        """Return the representation of the choice field label"""
-        try:
-            if hasattr(obj, 'profile') and obj.profile.main_character:
-                main_char = obj.profile.main_character
-                return f"{main_char.character_name} ({obj.username})"
-            else:
-                return f"{obj.username} (no main character)"
-        except Exception:
-            return obj.username
 
 
 class SystemOwnershipAdminForm(forms.ModelForm):
@@ -155,7 +141,7 @@ class SystemOwnershipAdmin(admin.ModelAdmin):
         "primary_user__username",
         "primary_user__profile__main_character__character_name",
         "discord_channel",
-        "auth_group__name",
+        "auth_group__group__name",
     )
 
     list_per_page = 50
@@ -349,7 +335,9 @@ class TaxCycleAdmin(admin.ModelAdmin):
 
     def overdue_status(self, obj):
         timing_status = obj.payment_timing_status
-        if timing_status == "overdue":
+        if timing_status == "paid":
+            return format_html('<span style="color: #28a745; font-weight: bold;">PAID</span>')
+        elif timing_status == "overdue":
             return format_html(
                 '<span style="color: #dc3545; font-weight: bold;">OVERDUE</span>'
             )
