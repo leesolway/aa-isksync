@@ -32,7 +32,6 @@ setup(
         "celery>=5.0.0",
         "requests>=2.25.0",
         "django-multiselectfield",
-        "allianceauth-app-utils>=1.0.0",
         "django-eveonline-sde>=0.0.1b2",
     ],
     extras_require={
