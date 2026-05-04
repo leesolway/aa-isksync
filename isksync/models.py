@@ -9,7 +9,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
-from eveuniverse.models import EveSolarSystem
+from eve_sde.models import SolarSystem
 
 from .constants import (
     TAXCYCLE_STATUS_CHOICES,
@@ -78,7 +78,7 @@ class OwnershipType(BaseModel):
 
 
 class SystemOwnership(BaseModel):
-    system = models.OneToOneField(EveSolarSystem, on_delete=models.CASCADE)
+    system = models.OneToOneField(SolarSystem, on_delete=models.CASCADE)
     ownership_type = models.ForeignKey(
         "OwnershipType",
         on_delete=models.PROTECT,
