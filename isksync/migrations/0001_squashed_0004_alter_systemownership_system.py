@@ -9,8 +9,6 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    replaces = [('isksync', '0001_initial'), ('isksync', '0002_alter_taxcycle_status'), ('isksync', '0003_alter_systemownership_auth_group'), ('isksync', '0004_alter_systemownership_system')]
-
     initial = True
 
     dependencies = [
